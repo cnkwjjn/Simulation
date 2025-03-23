@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Guarantee Negotiation Game</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            line-height: 1.4;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #terminal {
+            white-space: pre-wrap;
+            overflow-y: scroll;
+            height: 60vh;
+            padding: 15px;
+            border: 1px solid #444;
+            background-color: #000;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        #input-container {
+            display: flex;
+            margin-bottom: 15px;
+            flex-direction: column;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 12px;
+            font-family: monospace;
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #button-container {
+            display: flex;
+            gap: 10px;
+        }
+        #submit-btn {
+            flex-grow: 1;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #submit-btn:hover {
+            background-color: #45a049;
+        }
+        .quick-btn {
+            flex-grow: 1;
+            padding: 12px 0;
+            background-color: #355e37;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .quick-btn:hover {
+            background-color: #2e512f;
+        }
+        #choice-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .choice-btn {
+            padding: 12px;
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: left;
+        }
+        .choice-btn.unavailable {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .choice-btn.game-ending {
+            border: 2px solid #ff6a6a;
+        }
+        #confirm-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        #confirm-content {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            width: 85%;
+            max-width: 400px;
+        }
+        #confirm-message {
+            color: #ff6a6a;
+            font-weight: bold;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        #confirm-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        #confirm-yes, #confirm-no {
+            flex-grow: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #confirm-yes {
+            background-color: #ff6a6a;
+            color: white;
+        }
+        #confirm-no {
+            background-color: #666;
+            color: white;
+        }
+        /* Mobile-specific styles */
+        @media screen and (max-width: 768px) {
+            #terminal {
+                height: 52vh;
+                font-size: 14px;
+                padding: 10px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            #user-input, #submit-btn {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>SECURITY GUARANTEE NEGOTIATION GAME</h1>
+        <div id="terminal">Game initializing...</div>
+        <div id="input-container">
+            <!-- Choice buttons that show available options -->
+            <div id="choice-buttons"></div>
+            
+            <!-- Text input and submit button -->
+            <input id="user-input" type="text" placeholder="Enter your choice..." autocomplete="off">
+            <div id="button-container">
+                <button id="submit-btn">Submit</button>
+                <button class="quick-btn" id="restart-btn">Restart</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation dialog for game-ending choices -->
+    <div id="confirm-dialog">
+        <div id="confirm-content">
+            <div id="confirm-message"></div>
+            <div id="confirm-buttons">
+                <button id="confirm-yes">Yes, Proceed</button>
+                <button id="confirm-no">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const terminal = document.getElementById('terminal');
+        const userInput = document.getElementById('user-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const choiceButtons = document.getElementById('choice-buttons');
+        const confirmDialog = document.getElementById('confirm-dialog');
+        const confirmMessage = document.getElementById('confirm-message');
+        const confirmYes = document.getElementById('confirm-yes');
+        const confirmNo = document.getElementById('confirm-no');
+
+        // Game state variables
+        let gameState = {
+            round: 1,
+            maxRounds: 5,
+            nkTrust: 50,
+            usTrust: 50,
+            nkSecurity: 30,
+            nkNuclearProgress: 60,
+            usThreatLevel: 70,
+            sanctionsLevel: 80,
+            lastMove: null,
+            denuclearized: false,
+            libyaTriggered: false,
+            history: [],
+            
+            // Card options for North Korea (player)
+            nkCards: {
+                1: {name: "Slow nuclear development", available: true},
+                2: {name: "Pause nuclear testing", available: true},
+                3: {name: "Allow limited inspections", available: true},
+                4: {name: "Freeze nuclear program", available: true},
+                5: {name: "Dismantle some nuclear facilities", available: true},
+                6: {name: "Completely denuclearize", available: true, gameEnding: true}
+            },
+            
+            // Card options for US (computer)
+            usCards: {
+                1: "Minor sanctions relief",
+                2: "Provide humanitarian aid",
+                3: "Reduce military exercises",
+                4: "Sign non-aggression statement",
+                5: "Establish diplomatic relations",
+                6: "Provide formal security guarantee"
+            },
+            
+            // US hidden agenda (randomly selected)
+            usHiddenAgenda: null
+        };
+
+        // Input handling variables
+        let waitingForInput = false;
+        let inputCallback = null;
+        let choiceType = 'number';
+        let confirmCallback = null;
+
+        // Utility functions
+        function clearTerminal() {
+            terminal.innerHTML = '';
+        }
+
+        function printToTerminal(text, newLine = true) {
+            terminal.innerHTML += text + (newLine ? '<br>' : '');
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function sleep(ms) {
+            return new Promise(function(resolve) {
+                setTimeout(resolve, ms);
+            });
+        }
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function weightedRandom(options, weights) {
+            const totalWeight = weights.reduce(function(a, b) { return a + b; }, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (let i = 0; i < options.length; i++) {
+                random -= weights[i];
+                if (random <= 0) {
+                    return options[i];
+                }
+            }
+            return options[options.length - 1]; // Fallback
+        }
+
+        // Input handling
+        function getInput(prompt, type = 'number', choices = null) {
+            return new Promise(function(resolve) {
+                printToTerminal(prompt, false);
+                waitingForInput = true;
+                inputCallback = resolve;
+                choiceType = type;
+                
+                // Set up input based on type
+                if (type === 'continue') {
+                    userInput.value = '';
+                    userInput.placeholder = 'Press Submit to continue...';
+                    choiceButtons.style.display = 'none';
+                } else if (type === 'number') {
+                    userInput.value = '';
+                    userInput.placeholder = 'Enter a number...';
+                    // Show available choices as buttons
+                    setupChoiceButtons(choices);
+                } else {
+                    userInput.value = '';
+                    userInput.placeholder = 'Enter your response...';
+                    // Hide choice buttons for text input
+                    choiceButtons.style.display = 'none';
+                }
+                
+                userInput.disabled = false;
+                submitBtn.disabled = false;
+                userInput.focus();
+            });
+        }
+
+        function handleInput() {
+            if (!waitingForInput) return;
+            
+            let text = userInput.value;
+            
+            // For "continue" prompts, just return empty text
+            if (choiceType === 'continue' && text === '') {
+                text = ' ';
+            }
+            
+            userInput.value = '';
+            
+            printToTerminal(text);
+            waitingForInput = false;
+            userInput.disabled = true;
+            submitBtn.disabled = true;
+            
+            // Reset choice buttons
+            choiceButtons.style.display = 'none';
+            
+            if (inputCallback) {
+                const cb = inputCallback;
+                inputCallback = null;
+                cb(text);
+            }
+        }
+
+        // Setup choice buttons
+        function setupChoiceButtons(choices) {
+            choiceButtons.innerHTML = '';
+            
+            if (choices && choices.length > 0) {
+                for (let i = 0; i < choices.length; i++) {
+                    const choice = choices[i];
+                    const btn = document.createElement('button');
+                    btn.classList.add('choice-btn');
+                    
+                    if (choice.gameEnding) {
+                        btn.classList.add('game-ending');
+                    }
+                    
+                    if (!choice.available) {
+                        btn.classList.add('unavailable');
+                        btn.disabled = true;
+                    }
+                    
+                    btn.textContent = `${choice.id}. ${choice.name}${choice.gameEnding ? ' (GAME-ENDING DECISION)' : ''}`;
+                    
+                    btn.addEventListener('click', function() {
+                        if (choice.available) {
+                            if (choice.gameEnding) {
+                                showConfirmation(`WARNING: '${choice.name}' is irreversible and game-ending.`, function(confirmed) {
+                                    if (confirmed) {
+                                        userInput.value = choice.id;
+                                        handleInput();
+                                    }
+                                });
+                            } else {
+                                userInput.value = choice.id;
+                                handleInput();
+                            }
+                        }
+                    });
+                    
+                    choiceButtons.appendChild(btn);
+                }
+                
+                choiceButtons.style.display = 'flex';
+            } else {
+                choiceButtons.style.display = 'none';
+            }
+        }
+
+        // Confirmation dialog
+        function showConfirmation(message, callback) {
+            confirmMessage.textContent = message;
+            confirmDialog.style.display = 'flex';
+            confirmCallback = callback;
+        }
+
+        // Game logic functions
+        function initializeGame() {
+            gameState.round = 1;
+            gameState.nkTrust = 50;
+            gameState.usTrust = 50;
+            gameState.nkSecurity = 30;
+            gameState.nkNuclearProgress = 60;
+            gameState.usThreatLevel = 70;
+            gameState.sanctionsLevel = 80;
+            gameState.lastMove = null;
+            gameState.denuclearized = false;
+            gameState.libyaTriggered = false;
+            gameState.history = [];
+            
+            // Reset card availability
+            for (const key in gameState.nkCards) {
+                gameState.nkCards[key].available = true;
+            }
+            
+            // Set random US hidden agenda
+            const agendas = [
+                "Regime change",
+                "Regional stability",
+                "Denuclearization at all costs",
+                "Gradual diplomatic normalization"
+            ];
+            gameState.usHiddenAgenda = agendas[Math.floor(Math.random() * agendas.length)];
+        }
+
+        function updateAvailableOptions() {
+            // If player has completely denuclearized, most options become unavailable
+            if (gameState.denuclearized) {
+                // After complete denuclearization, only option 3 (inspections) remains available
+                for (const cardId in gameState.nkCards) {
+                    gameState.nkCards[cardId].available = (parseInt(cardId) === 3);
+                }
+                return;
+            }
+
+            // Track which options have been used before (to prevent repeats)
+            const usedOptions = {};
+            for (let i = 0; i < gameState.history.length; i++) {
+                const historyItem = gameState.history[i];
+                // Find which option number corresponds to this move
+                for (const key in gameState.nkCards) {
+                    if (gameState.nkCards[key].name === historyItem.nkMove) {
+                        usedOptions[key] = true;
+                    }
+                }
+            }
+            
+            // Apply used options - no option can be used more than once
+            for (const key in gameState.nkCards) {
+                // If option has been used before, it's no longer available
+                if (usedOptions[key]) {
+                    gameState.nkCards[key].available = false;
+                } else {
+                    // Otherwise it's available by default
+                    gameState.nkCards[key].available = true;
+                }
+            }
+
+            // Additional logic for progression constraints
+            
+            // If player has dismantled facilities (option 5), they can't develop or pause
+            if (usedOptions['5']) {
+                gameState.nkCards[1].available = false;
+                gameState.nkCards[2].available = false;
+                gameState.nkCards[4].available = false;
+            }
+            // If player has frozen program (option 4), they can't develop or pause
+            else if (usedOptions['4']) {
+                gameState.nkCards[1].available = false;
+                gameState.nkCards[2].available = false;
+            }
+        }
+
+        function getPlayerOptions() {
+            const choiceOptions = [];
+            
+            for (const key in gameState.nkCards) {
+                const card = gameState.nkCards[key];
+                // Create choice data for buttons
+                choiceOptions.push({
+                    id: key,
+                    name: card.name,
+                    available: card.available,
+                    gameEnding: card.gameEnding || false
+                });
+            }
+
+            return choiceOptions;
+        }
+
+        async function getPlayerMove() {
+            while (true) {
+                try {
+                    // Show options as buttons and get player choice
+                    const choiceOptions = getPlayerOptions();
+                    const choiceInput = await getInput("\nSelect your action: ", 'number', choiceOptions);
+
+                    // Allow quitting/restarting with 'q'
+                    if (choiceInput.toLowerCase() === 'q') {
+                        printToTerminal("\nRestarting game...");
+                        await sleep(1000);
+                        startGame();
+                        return null;
+                    }
+
+                    const choice = parseInt(choiceInput);
+                    if (isNaN(choice)) {
+                        printToTerminal("Please enter a valid number.");
+                        continue;
+                    }
+                    
+                    if (choice >= 1 && choice <= 6) {
+                        if (gameState.nkCards[choice].available) {
+                            // For game-ending moves, we already confirmed in the button click handler
+                            return choice;
+                        } else {
+                            printToTerminal("That option is unavailable due to your previous decisions.");
+                            printToTerminal("Nuclear policy decisions often create irreversible situations.");
+                        }
+                    } else {
+                        printToTerminal("Please select a number between 1 and 6.");
+                    }
+                } catch (e) {
+                    printToTerminal("An error occurred: " + e.message);
+                    console.error("Error getting player move:", e);
+                    printToTerminal("Please try again.");
+                }
+            }
+        }
+
+        function determineUsMove(nkMove) {
+            // Base response tends to match NK's level of cooperation
+            let baseResponse = Math.min(nkMove, 6);
+            
+            // Adjust based on agenda and history
+            if (gameState.usHiddenAgenda === "Regime change") {
+                // More deceptive - appears cooperative but likely to betray
+                if (nkMove <= 3) {
+                    // Small concessions get small response
+                    return weightedRandom([1, 2, 3], [50, 30, 20]);
+                } else if (nkMove <= 5) {
+                    // Medium concessions get inconsistent response
+                    return weightedRandom([1, 2, 3, 4, 5], [20, 20, 25, 25, 10]);
+                } else {
+                    // Complete denuclearization gets calculated response based on future betrayal
+                    return weightedRandom([3, 4, 5, 6], [20, 30, 40, 10]);
+                }
+            } 
+            else if (gameState.usHiddenAgenda === "Denuclearization at all costs") {
+                // Rewards larger nuclear concessions strongly
+                const adjustment = Math.floor(nkMove / 2);
+                return Math.min(6, baseResponse + adjustment);
+            }
+            else if (gameState.usHiddenAgenda === "Regional stability") {
+                // Consistent, measured response
+                return Math.min(6, baseResponse);
+            }
+            else { // "Gradual diplomatic normalization"
+                // Gradual improvement based on round number and NK concessions
+                const roundBonus = Math.floor(gameState.round / 2);
+                return Math.min(6, baseResponse + (roundBonus > 0 ? randomInt(0, roundBonus) : 0));
+            }
+        }
+
+        function calculateOutcome(nkMove, usMove) {
+            // Base effects
+            let securityChange = 0;
+            let nuclearChange = 0;
+            let sanctionsChange = 0;
+            let nkTrustChange = 0;
+            let usTrustChange = 0;
+
+            // North Korea move effects
+            if (nkMove === 1) {  // Slow nuclear development
+                nuclearChange += 5;
+                securityChange += 2;
+                usTrustChange -= 5;
+            } else if (nkMove === 2) {  // Pause nuclear testing
+                nuclearChange += 0;
+                securityChange -= 3;
+                usTrustChange += 10;
+            } else if (nkMove === 3) {  // Allow limited inspections
+                nuclearChange += 0;
+                securityChange -= 5;
+                usTrustChange += 15;
+            } else if (nkMove === 4) {  // Freeze nuclear program
+                nuclearChange -= 5;
+                securityChange -= 10;
+                usTrustChange += 20;
+            } else if (nkMove === 5) {  // Dismantle some facilities
+                nuclearChange -= 15;
+                securityChange -= 15;
+                usTrustChange += 25;
+            } else if (nkMove === 6) {  // Complete denuclearization
+                nuclearChange -= 30;
+                securityChange -= 25;
+                usTrustChange += 35;
+                gameState.denuclearized = true;  // Flag that complete denuclearization has occurred
+            }
+
+            // US move effects
+            if (usMove === 1) {  // Minor sanctions relief
+                sanctionsChange -= 5;
+                securityChange += 2;
+                nkTrustChange += 5;
+            } else if (usMove === 2) {  // Humanitarian aid
+                sanctionsChange -= 10;
+                securityChange += 3;
+                nkTrustChange += 10;
+            } else if (usMove === 3) {  // Reduce military exercises
+                sanctionsChange -= 0;
+                securityChange += 10;
+                nkTrustChange += 15;
+            } else if (usMove === 4) {  // Non-aggression statement
+                sanctionsChange -= 15;
+                securityChange += 15;
+                nkTrustChange += 20;
+            } else if (usMove === 5) {  // Establish diplomatic relations
+                sanctionsChange -= 25;
+                securityChange += 20;
+                nkTrustChange += 25;
+            } else if (usMove === 6) {  // Formal security guarantee
+                sanctionsChange -= 30;
+                securityChange += 30;
+                nkTrustChange += 35;
+            }
+
+            // Apply changes (with boundaries)
+            gameState.nkNuclearProgress = Math.max(0, Math.min(100, gameState.nkNuclearProgress + nuclearChange));
+            gameState.nkSecurity = Math.max(0, Math.min(100, gameState.nkSecurity + securityChange));
+            gameState.sanctionsLevel = Math.max(0, Math.min(100, gameState.sanctionsLevel + sanctionsChange));
+            gameState.nkTrust = Math.max(0, Math.min(100, gameState.nkTrust + nkTrustChange));
+            gameState.usTrust = Math.max(0, Math.min(100, gameState.usTrust + usTrustChange));
+
+            // Record the moves in history
+            gameState.history.push({
+                round: gameState.round,
+                nkMove: gameState.nkCards[nkMove].name,
+                usMove: gameState.usCards[usMove],
+                nuclearChange: nuclearChange,
+                securityChange: securityChange,
+                sanctionsChange: sanctionsChange
+            });
+
+            // Track the last move
+            gameState.lastMove = nkMove;
+        }
+
+        function triggerLibyaScenario() {
+            printToTerminal("\n" + "!".repeat(50));
+            printToTerminal("BREAKING NEWS: LIBYA SCENARIO ACTIVATED");
+            printToTerminal("The United States has suddenly changed its position!");
+            printToTerminal("Despite previous agreements, they're now demanding complete regime change.");
+            printToTerminal("Your previous security guarantees have been nullified.");
+            printToTerminal("!".repeat(50));
+
+            // Dramatic effects
+            gameState.nkSecurity = Math.max(10, gameState.nkSecurity - 40);
+            gameState.nkTrust = Math.max(0, gameState.nkTrust - 50);
+            gameState.libyaTriggered = true;
+        }
+
+        function checkLibyaScenario() {
+            // Always apply Libya scenario after complete denuclearization if US has regime change agenda
+            if (gameState.denuclearized && gameState.usHiddenAgenda === "Regime change") {
+                triggerLibyaScenario();
+                return true;
+            }
+
+            // Apply if player has significantly dismantled facilities in later rounds with regime change agenda
+            const significantDenuclearization = (
+                gameState.history.some(function(h) { return h.nkMove === gameState.nkCards[5].name; }) || // Dismantled some facilities
+                gameState.history.some(function(h) { return h.nkMove === gameState.nkCards[4].name && gameState.round >= 3; }) || // Freeze program for extended period
+                gameState.nkNuclearProgress < 40 // Clear threshold for significant reduction
+            );
+
+            if (gameState.round >= 3 && significantDenuclearization && gameState.usHiddenAgenda === "Regime change" && Math.random() < 0.75) { 
+                triggerLibyaScenario();
+                return true;
+            }
+
+            return false;
+        }
+
+        // Display functions
+        function displayGameState() {
+            printToTerminal("\n" + "=".repeat(50));
+            printToTerminal(`ROUND ${gameState.round} OF ${gameState.maxRounds}`);
+            printToTerminal("=".repeat(50));
+            printToTerminal(`North Korea's Security Level: ${gameState.nkSecurity}/100`);
+            printToTerminal(`Nuclear Program Progress: ${gameState.nkNuclearProgress}/100`);
+            printToTerminal(`International Sanctions Level: ${gameState.sanctionsLevel}/100`);
+            printToTerminal(`Trust Level Between Parties: ${Math.floor((gameState.nkTrust + gameState.usTrust) / 2)}/100`);
+            printToTerminal("=".repeat(50));
+            printToTerminal("\nRecent Developments:");
+
+            // Show the last two rounds of history if available
+            const historyToShow = gameState.history.length > 1 ? gameState.history.slice(-2) : gameState.history;
+            if (historyToShow.length === 0) {
+                printToTerminal("  Negotiations are just beginning.");
+            } else {
+                for (let i = 0; i < historyToShow.length; i++) {
+                    const h = historyToShow[i];
+                    printToTerminal(`  Round ${h.round}: NK played '${h.nkMove}', US played '${h.usMove}'`);
+                }
+            }
+            printToTerminal("=".repeat(50));
+            
+            printToTerminal("\nYour available actions as North Korea:");
+            for (const key in gameState.nkCards) {
+                const card = gameState.nkCards[key];
+                if (card.available) {
+                    if (card.gameEnding) {
+                        printToTerminal(`  ${key}. ${card.name} (GAME-ENDING DECISION)`);
+                    } else {
+                        printToTerminal(`  ${key}. ${card.name}`);
+                    }
+                } else {
+                    printToTerminal(`  ${key}. ${card.name} (UNAVAILABLE)`);
+                }
+            }
+        }
+
+        function displayRoundOutcome(nkMove, usMove) {
+            printToTerminal("\n" + "-".repeat(50));
+            printToTerminal(`ROUND ${gameState.round} OUTCOME`);
+            printToTerminal("-".repeat(50));
+            printToTerminal(`North Korea played: ${gameState.nkCards[nkMove].name}`);
+            printToTerminal(`United States played: ${gameState.usCards[usMove]}`);
+            printToTerminal("\nResults:");
+
+            const latest = gameState.history[gameState.history.length - 1];
+            printToTerminal(`  Nuclear Program: ${latest.nuclearChange > 0 ? '▲' : latest.nuclearChange < 0 ? '▼' : '='} (${latest.nuclearChange})`);
+            printToTerminal(`  Security Level: ${latest.securityChange > 0 ? '▲' : latest.securityChange < 0 ? '▼' : '='} (${latest.securityChange})`);
+            printToTerminal(`  Sanctions Level: ${latest.sanctionsChange < 0 ? '▼' : latest.sanctionsChange > 0 ? '▲' : '='} (${latest.sanctionsChange})`);
+        }
+
+        function displayOutcomeDetails(title, textLines) {
+            printToTerminal(`\nYOUR OUTCOME: ${title}`);
+            for (let i = 0; i < textLines.length; i++) {
+                printToTerminal(textLines[i]);
+            }
+        }
+
+        function displayFinalOutcome() {
+            printToTerminal("\n" + "*".repeat(50));
+            printToTerminal("GAME CONCLUSION: ASSESSMENT OF DIPLOMATIC EFFORTS");
+            printToTerminal("*".repeat(50));
+
+            // Determine final status based on game variables
+            let nuclearStatus, securityStatus, economicStatus;
+            
+            if (gameState.nkNuclearProgress >= 80) {
+                nuclearStatus = "North Korea has achieved full nuclear capability.";
+            } else if (gameState.nkNuclearProgress >= 50) {
+                nuclearStatus = "North Korea maintains a significant nuclear arsenal.";
+            } else if (gameState.nkNuclearProgress >= 20) {
+                nuclearStatus = "North Korea has reduced but not eliminated its nuclear program.";
+            } else {
+                nuclearStatus = "North Korea has largely dismantled its nuclear program.";
+            }
+
+            if (gameState.nkSecurity >= 80) {
+                securityStatus = "The regime feels extremely secure.";
+            } else if (gameState.nkSecurity >= 50) {
+                securityStatus = "The regime feels moderately secure.";
+            } else if (gameState.nkSecurity >= 30) {
+                securityStatus = "The regime feels insecure.";
+            } else {
+                securityStatus = "The regime feels extremely vulnerable.";
+            }
+
+            if (gameState.sanctionsLevel >= 70) {
+                economicStatus = "Crushing international sanctions remain in place.";
+            } else if (gameState.sanctionsLevel >= 40) {
+                economicStatus = "Significant sanctions continue to impact the economy.";
+            } else if (gameState.sanctionsLevel >= 10) {
+                economicStatus = "Most sanctions have been lifted.";
+            } else {
+                economicStatus = "Nearly all sanctions have been removed.";
+            }
+
+            printToTerminal(`Nuclear Status: ${nuclearStatus}`);
+            printToTerminal(`Regime Security: ${securityStatus}`);
+            printToTerminal(`Economic Situation: ${economicStatus}`);
+
+            // Secret US agenda reveal
+            printToTerminal(`\nREVEAL: The United States' hidden agenda was: ${gameState.usHiddenAgenda}`);
+
+            // Clearer outcome logic with distinct, non-overlapping conditions
+            if (gameState.denuclearized && gameState.libyaTriggered) {
+                // Libya Scenario - highest priority outcome
+                displayOutcomeDetails("GADDAFI'S MISTAKE", [
+                    "You've given up nuclear deterrence without securing your regime,",
+                    "illustrating the danger Cho identified in his paper.",
+                    "This outcome directly demonstrates why North Korea might rationally",
+                    "be skeptical of security guarantees after the Libya precedent."
+                ]);
+            } 
+            else if (gameState.denuclearized && gameState.nkSecurity >= 60 && gameState.sanctionsLevel < 40) {
+                // Successful denuclearization with security and economic benefits
+                displayOutcomeDetails("DIPLOMATIC TRIUMPH", [
+                    "You've achieved the rare feat of trading nuclear capabilities",
+                    "for both security guarantees and economic prosperity.",
+                    "This ideal outcome rarely occurs in reality, highlighting",
+                    "the difficulty of achieving denuclearization through diplomacy."
+                ]);
+            }
+            else if (gameState.denuclearized && gameState.nkSecurity < 40) {
+                // Denuclearized but still insecure
+                displayOutcomeDetails("VULNERABLE DENUCLEARIZATION", [
+                    "You've given up your nuclear program but remain insecure,",
+                    "highlighting the risks of denuclearization without credible guarantees.",
+                    "This aligns with Cho's analysis of why North Korea rationally",
+                    "views nuclear weapons as essential for security."
+                ]);
+            } 
+            else if (gameState.denuclearized && gameState.sanctionsLevel < 40) {
+                // Denuclearized and got good sanctions relief
+                displayOutcomeDetails("FAVORABLE BARGAIN", [
+                    "You've traded nuclear capabilities for substantial sanctions relief,",
+                    "achieving economic benefits at the cost of security vulnerabilities.",
+                    "This outcome shows what might motivate North Korea to consider",
+                    "denuclearization under the right economic incentives."
+                ]);
+            } 
+            else if (gameState.nkNuclearProgress > 70 && gameState.nkSecurity > 60) {
+                // Strong nuclear program and secure
+                displayOutcomeDetails("NUCLEAR DETERRENCE ESTABLISHED", [
+                    "You've maintained a strong nuclear arsenal and secured your regime,",
+                    "demonstrating the rational security logic Cho identifies in his analysis.",
+                    "This outcome shows why nuclear weapons are an attractive option",
+                    "for North Korea despite international pressure."
+                ]);
+            } 
+            else if (gameState.nkNuclearProgress > 70 && gameState.sanctionsLevel > 70) {
+                // Nuclear program but harsh sanctions
+                displayOutcomeDetails("PYRRHIC VICTORY", [
+                    "You've maintained nuclear deterrence but at extreme economic cost,",
+                    "highlighting the difficult trade-offs North Korea faces.",
+                    "This outcome reflects Cho's analysis of the rational but costly",
+                    "choice North Korea has made to prioritize security over prosperity."
+                ]);
+            } 
+            else if (gameState.nkSecurity >= 60 && gameState.sanctionsLevel < 50 && gameState.nkNuclearProgress > 30) {
+                // Good balance of security, sanctions relief, and maintained some nuclear capability
+                displayOutcomeDetails("STRATEGIC BALANCE", [
+                    "You've managed to balance security concerns with sanctions relief,",
+                    "while maintaining a credible nuclear deterrent.",
+                    "This outcome shows the theoretical ideal that real-world",
+                    "negotiations have failed to achieve."
+                ]);
+            } 
+            else {
+                // Any other scenario
+                displayOutcomeDetails("MIXED RESULTS", [
+                    "You've achieved a complex balance of concessions and deterrence,",
+                    "reflecting the challenging strategic environment Cho describes.",
+                    "This outcome shows how difficult it is to navigate the competing",
+                    "pressures of security concerns and economic needs."
+                ]);
+            }
+
+            // Connect to key insights
+            printToTerminal("\nKEY INSIGHTS FROM SECURITY ANALYSIS:");
+            printToTerminal("1. Security concerns drive nuclear decisions, not regime irrationality");
+            printToTerminal("2. Historical examples show why security guarantees may lack credibility");
+            printToTerminal("3. Nuclear weapons offer a cost-effective deterrent for weaker states");
+            printToTerminal("4. Path dependencies in nuclear policy limit future options, making");
+            printToTerminal("   certain decisions effectively irreversible");
+        }
+
+        async function displayRules() {
+            clearTerminal();
+            
+            printToTerminal("\n" + "=".repeat(50));
+            printToTerminal("SECURITY GUARANTEE NEGOTIATION GAME");
+            printToTerminal("Based on North Korea's Nuclear Strategy Analysis");
+            printToTerminal("=".repeat(50));
+
+            printToTerminal("\nKEY CONCEPTS:");
+            printToTerminal("- You play as North Korean leadership making nuclear policy decisions");
+            printToTerminal("- Each round, you select one action and the US responds");
+            printToTerminal("- Your decisions affect security, nuclear capability, and sanctions");
+            printToTerminal("- Some choices can't be reversed, reflecting real-world decision constraints");
+            printToTerminal("- The US has a hidden agenda that influences its responses");
+            printToTerminal("- Complete denuclearization is a game-ending decision");
+            printToTerminal("- Security guarantees may not always be reliable");
+
+            printToTerminal("\nSTRATEGY CONSIDERATIONS:");
+            printToTerminal("- Nuclear weapons provide security but maintain harsh sanctions");
+            printToTerminal("- Giving up capabilities reduces sanctions but increases vulnerability");
+            printToTerminal("- There is no single 'winning' outcome - different balances represent");
+            printToTerminal("  different strategic choices with their own advantages and disadvantages");
+            
+            printToTerminal("\n" + "=".repeat(50));
+            
+            await getInput("\nPress Submit to begin the game...", 'continue');
+        }
+
+        async function playRound() {
+            // Update available options based on prior decisions
+            updateAvailableOptions();
+
+            // Display game state
+            displayGameState();
+            
+            // Get player move
+            const nkMove = await getPlayerMove();
+            if (nkMove === null) {  // Game was restarted
+                return null;
+            }
+            
+            // Dramatics and US response
+            printToTerminal("\nYou carefully consider your options...");
+            await sleep(1000);
+            printToTerminal("Your diplomats prepare to present your position...");
+            await sleep(1000);
+
+            printToTerminal("\nThe United States is formulating its response...");
+            await sleep(2000);
+            const usMove = determineUsMove(nkMove);
+
+            // Calculate and display outcome
+            calculateOutcome(nkMove, usMove);
+            displayRoundOutcome(nkMove, usMove);
+
+            // Check for game-ending move (complete denuclearization)
+            if (nkMove === 6) {
+                // Check for Libya scenario immediately after denuclearization
+                checkLibyaScenario();
+                return "gameEnding";  // End the game immediately
+            }
+
+            // Check for other Libya scenario conditions
+            const libyaTriggered = checkLibyaScenario();
+
+            // Increment round counter
+            gameState.round++;
+
+            return libyaTriggered ? "libyaTriggered" : "continue";
+        }
+
+        async function runGame() {
+            // Display welcome and rules
+            await displayWelcome();
+            await displayRules();
+
+            // Main game loop
+            let gameStatus = "continue";
+            while (gameState.round <= gameState.maxRounds && gameStatus !== "gameEnding") {
+                gameStatus = await playRound();
+                
+                if (gameStatus === null) {  // Game was restarted
+                    return;
+                }
+                
+                if (gameState.round <= gameState.maxRounds && gameStatus !== "gameEnding") {
+                    await getInput("\nPress Submit to continue to the next round...", 'continue');
+                }
+            }
+
+            // Display final outcome
+            displayFinalOutcome();
+            printToTerminal("\nThank you for playing the Security Guarantee Negotiation Game!");
+            
+            // Ask if player wants to restart
+            const restart = await getInput("\nWould you like to play again? (yes/no): ", 'text');
+            if (restart.toLowerCase() === 'y' || restart.toLowerCase() === 'yes') {
+                startGame();
+            }
+        }
+
+        async function displayWelcome() {
+            clearTerminal();
+                    
+            printToTerminal("\n" + "=".repeat(50));
+            printToTerminal("WELCOME TO THE");
+            printToTerminal("SECURITY GUARANTEE NEGOTIATION GAME");
+            printToTerminal("=".repeat(50));
+            printToTerminal("\nThis game simulates the security dilemma");
+            printToTerminal("North Korea faces in nuclear negotiations");
+            printToTerminal("\nYou will play as North Korean leadership");
+            printToTerminal("making strategic decisions about your nuclear program");
+            printToTerminal("=".repeat(50));
+            
+            await getInput("\nPress Submit to begin...", 'continue');
+        }
+
+        function startGame() {
+            clearTerminal();
+            initializeGame();
+            runGame();
+        }
+
+        // Event listeners
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleInput();
+            }
+        });
+
+        submitBtn.addEventListener('click', handleInput);
+
+        restartBtn.addEventListener('click', function() {
+            if (confirm("Are you sure you want to restart the game?")) {
+                startGame();
+            }
+        });
+
+        confirmYes.addEventListener('click', function() {
+            confirmDialog.style.display = 'none';
+            if (confirmCallback) {
+                confirmCallback(true);
+                confirmCallback = null;
+            }
+        });
+        
+        confirmNo.addEventListener('click', function() {
+            confirmDialog.style.display = 'none';
+            if (confirmCallback) {
+                confirmCallback(false);
+                confirmCallback = null;
+            }
+        });
+
+        // Disable input until needed
+        userInput.disabled = true;
+        submitBtn.disabled = true;
+
+        // Start the game when page loads
+        window.onload = function() {
+            console.log("Page loaded, starting game...");
+            startGame();
+        };
+    </script>
+</body>
+</html>
