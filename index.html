@@ -50,24 +50,11 @@
             border-radius: 5px;
             font-size: 18px;
             margin-bottom: 10px;
+            display: none;
         }
         #button-container {
             display: flex;
             gap: 10px;
-        }
-        #submit-btn {
-            flex-grow: 1;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 12px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        #submit-btn:hover {
-            background-color: #45a049;
         }
         .quick-btn {
             flex-grow: 1;
@@ -162,7 +149,7 @@
             h1 {
                 font-size: 20px;
             }
-            #user-input, #submit-btn {
+            #user-input {
                 font-size: 18px;
             }
         }
@@ -173,15 +160,9 @@
         <h1>SECURITY GUARANTEE NEGOTIATION GAME</h1>
         <div id="terminal">Game initializing...</div>
         <div id="input-container">
-            <!-- Choice buttons that show available options -->
             <div id="choice-buttons"></div>
-            
-            <!-- Text input and submit button -->
             <input id="user-input" type="text" placeholder="Enter your choice..." autocomplete="off">
-            <div id="button-container">
-                <button id="submit-btn">Submit</button>
-                <button class="quick-btn" id="restart-btn">Restart</button>
-            </div>
+            <div id="button-container"></div>
         </div>
     </div>
     
@@ -200,13 +181,12 @@
         // DOM Elements
         const terminal = document.getElementById('terminal');
         const userInput = document.getElementById('user-input');
-        const submitBtn = document.getElementById('submit-btn');
-        const restartBtn = document.getElementById('restart-btn');
         const choiceButtons = document.getElementById('choice-buttons');
         const confirmDialog = document.getElementById('confirm-dialog');
         const confirmMessage = document.getElementById('confirm-message');
         const confirmYes = document.getElementById('confirm-yes');
         const confirmNo = document.getElementById('confirm-no');
+        const buttonContainer = document.getElementById('button-container');
 
         // Game state variables
         let gameState = {
@@ -286,34 +266,121 @@
             return options[options.length - 1]; // Fallback
         }
 
+        // Function to manage button visibility based on game state
+        function updateButtonVisibility(mode) {
+            // Clear existing buttons
+            buttonContainer.innerHTML = '';
+            
+            switch(mode) {
+                case 'continue':
+                    // Create continue button
+                    const continueBtn = document.createElement('button');
+                    continueBtn.id = 'continue-btn';
+                    continueBtn.textContent = 'Continue';
+                    continueBtn.className = 'quick-btn';
+                    continueBtn.style.backgroundColor = '#4CAF50';
+                    
+                    continueBtn.addEventListener('click', function() {
+                        if (waitingForInput && choiceType === 'continue') {
+                            handleInput();
+                        }
+                    });
+                    
+                    buttonContainer.appendChild(continueBtn);
+                    break;
+                    
+                case 'choices':
+                    // No buttons in bottom container when showing choice buttons
+                    break;
+                    
+                case 'restart':
+                    // Only show restart button at end of game
+                    const restartBtn = document.createElement('button');
+                    restartBtn.id = 'restart-btn';
+                    restartBtn.textContent = 'Restart Game';
+                    restartBtn.className = 'quick-btn';
+                    
+                    restartBtn.addEventListener('click', function() {
+                        if (confirm("Are you sure you want to restart the game?")) {
+                            startGame();
+                        }
+                    });
+                    
+                    buttonContainer.appendChild(restartBtn);
+                    break;
+                    
+                default:
+                    // Default case - show restart button
+                    const defaultRestartBtn = document.createElement('button');
+                    defaultRestartBtn.id = 'restart-btn';
+                    defaultRestartBtn.textContent = 'Restart Game';
+                    defaultRestartBtn.className = 'quick-btn';
+                    
+                    defaultRestartBtn.addEventListener('click', function() {
+                        if (confirm("Are you sure you want to restart the game?")) {
+                            startGame();
+                        }
+                    });
+                    
+                    buttonContainer.appendChild(defaultRestartBtn);
+                    break;
+            }
+        }
+
         // Input handling
         function getInput(prompt, type = 'number', choices = null) {
             return new Promise(function(resolve) {
                 printToTerminal(prompt, false);
-                waitingForInput = true;
-                inputCallback = resolve;
-                choiceType = type;
                 
-                // Set up input based on type
+                // If this is a continue prompt, use the continue button
                 if (type === 'continue') {
-                    userInput.value = '';
-                    userInput.placeholder = 'Press Submit to continue...';
-                    choiceButtons.style.display = 'none';
-                } else if (type === 'number') {
-                    userInput.value = '';
-                    userInput.placeholder = 'Enter a number...';
+                    // Hide input field
+                    userInput.style.display = 'none';
+                    
+                    // Update button to Continue mode
+                    updateButtonVisibility('continue');
+                    
+                    waitingForInput = true;
+                    inputCallback = resolve;
+                    choiceType = type;
+                } 
+                // If this is a number input with choice buttons
+                else if (type === 'number' && choices && choices.length > 0) {
+                    // Hide the text input
+                    userInput.style.display = 'none';
+                    
+                    // Hide buttons at the bottom since we're using choice buttons
+                    updateButtonVisibility('choices');
+                    
+                    waitingForInput = true;
+                    inputCallback = resolve;
+                    choiceType = type;
+                    
                     // Show available choices as buttons
                     setupChoiceButtons(choices);
-                } else {
+                }
+                // For any other input type (like text input)
+                else {
+                    // For any other input type, use the regular input field
+                    waitingForInput = true;
+                    inputCallback = resolve;
+                    choiceType = type;
+                    
+                    // Make sure input is visible
+                    userInput.style.display = '';
+                    
+                    // Show restart button
+                    updateButtonVisibility('default');
+                    
                     userInput.value = '';
-                    userInput.placeholder = 'Enter your response...';
+                    userInput.placeholder = type === 'number' ? 'Enter a number...' : 'Enter your response...';
+                    
                     // Hide choice buttons for text input
                     choiceButtons.style.display = 'none';
+                    
+                    userInput.disabled = false;
+                    userInput.focus();
                 }
-                
-                userInput.disabled = false;
-                submitBtn.disabled = false;
-                userInput.focus();
             });
         }
 
@@ -332,10 +399,12 @@
             printToTerminal(text);
             waitingForInput = false;
             userInput.disabled = true;
-            submitBtn.disabled = true;
             
             // Reset choice buttons
             choiceButtons.style.display = 'none';
+            
+            // Restore default button state
+            updateButtonVisibility('default');
             
             if (inputCallback) {
                 const cb = inputCallback;
@@ -370,13 +439,11 @@
                             if (choice.gameEnding) {
                                 showConfirmation(`WARNING: '${choice.name}' is irreversible and game-ending.`, function(confirmed) {
                                     if (confirmed) {
-                                        userInput.value = choice.id;
-                                        handleInput();
+                                        handleChoiceSelection(choice.id);
                                     }
                                 });
                             } else {
-                                userInput.value = choice.id;
-                                handleInput();
+                                handleChoiceSelection(choice.id);
                             }
                         }
                     });
@@ -387,6 +454,23 @@
                 choiceButtons.style.display = 'flex';
             } else {
                 choiceButtons.style.display = 'none';
+            }
+        }
+
+        // New function to handle choice selection directly
+        function handleChoiceSelection(choiceId) {
+            // Print the selected choice to the terminal
+            printToTerminal(choiceId);
+            waitingForInput = false;
+            
+            // Hide choice buttons
+            choiceButtons.style.display = 'none';
+            
+            // Call the callback with the selected choice
+            if (inputCallback) {
+                const cb = inputCallback;
+                inputCallback = null;
+                cb(choiceId);
             }
         }
 
@@ -427,52 +511,51 @@
         }
 
         function updateAvailableOptions() {
-            // If player has completely denuclearized, most options become unavailable
-            if (gameState.denuclearized) {
-                // After complete denuclearization, only option 3 (inspections) remains available
-                for (const cardId in gameState.nkCards) {
-                    gameState.nkCards[cardId].available = (parseInt(cardId) === 3);
-                }
-                return;
-            }
+    // If player has completely denuclearized, most options become unavailable
+    if (gameState.denuclearized) {
+        // After complete denuclearization, only option 3 (inspections) remains available
+        for (const cardId in gameState.nkCards) {
+            gameState.nkCards[cardId].available = (parseInt(cardId) === 3);
+        }
+        return;
+    }
 
-            // Track which options have been used before (to prevent repeats)
-            const usedOptions = {};
-            for (let i = 0; i < gameState.history.length; i++) {
-                const historyItem = gameState.history[i];
-                // Find which option number corresponds to this move
-                for (const key in gameState.nkCards) {
-                    if (gameState.nkCards[key].name === historyItem.nkMove) {
-                        usedOptions[key] = true;
-                    }
-                }
-            }
-            
-            // Apply used options - no option can be used more than once
-            for (const key in gameState.nkCards) {
-                // If option has been used before, it's no longer available
-                if (usedOptions[key]) {
-                    gameState.nkCards[key].available = false;
-                } else {
-                    // Otherwise it's available by default
-                    gameState.nkCards[key].available = true;
-                }
-            }
-
-            // Additional logic for progression constraints
-            
-            // If player has dismantled facilities (option 5), they can't develop or pause
-            if (usedOptions['5']) {
-                gameState.nkCards[1].available = false;
-                gameState.nkCards[2].available = false;
-                gameState.nkCards[4].available = false;
-            }
-            // If player has frozen program (option 4), they can't develop or pause
-            else if (usedOptions['4']) {
-                gameState.nkCards[1].available = false;
-                gameState.nkCards[2].available = false;
+    // Track which options have been used before (to prevent repeats)
+    const usedOptions = {};
+    for (let i = 0; i < gameState.history.length; i++) {
+        const historyItem = gameState.history[i];
+        // Find which option number corresponds to this move
+        for (const key in gameState.nkCards) {
+            if (gameState.nkCards[key].name === historyItem.nkMove) {
+                usedOptions[key] = true;
             }
         }
+    }
+    
+    // Apply used options - no option can be used more than once
+    for (const key in gameState.nkCards) {
+        // If option has been used before, it's no longer available
+        if (usedOptions[key]) {
+            gameState.nkCards[key].available = false;
+        } else {
+            // Otherwise it's available by default
+            gameState.nkCards[key].available = true;
+        }
+    }
+
+    // Additional logic for progression constraints - revised to be more logical
+    
+    // If player has dismantled facilities (option 5), they can't develop new capabilities
+    if (usedOptions['5']) {
+        gameState.nkCards[1].available = false; // Can't develop new capabilities
+        // But can still do other options like pausing testing or allowing inspections
+    }
+    
+    // If player has frozen program (option 4), they can't develop
+    if (usedOptions['4']) {
+        gameState.nkCards[1].available = false; // Can't develop when frozen
+    }
+}
 
         function getPlayerOptions() {
             const choiceOptions = [];
@@ -739,7 +822,9 @@
         }
 
         function displayOutcomeDetails(title, textLines) {
-            printToTerminal(`\nYOUR OUTCOME: ${title}`);
+            printToTerminal("\n************************************");
+            printToTerminal(`~~~YOUR OUTCOME~~~: ${title}`);
+            printToTerminal("************************************");
             for (let i = 0; i < textLines.length; i++) {
                 printToTerminal(textLines[i]);
             }
@@ -864,13 +949,14 @@
                 ]);
             }
 
-            // Connect to key insights
-            printToTerminal("\nKEY INSIGHTS FROM SECURITY ANALYSIS:");
-            printToTerminal("1. Security concerns drive nuclear decisions, not regime irrationality");
-            printToTerminal("2. Historical examples show why security guarantees may lack credibility");
-            printToTerminal("3. Nuclear weapons offer a cost-effective deterrent for weaker states");
-            printToTerminal("4. Path dependencies in nuclear policy limit future options, making");
-            printToTerminal("   certain decisions effectively irreversible");
+        }
+
+        function displayRestartPrompt() {
+            // Update the button at the bottom to be the restart button
+            updateButtonVisibility('restart');
+            
+            // Scroll to make sure the button is visible
+            terminal.scrollTop = terminal.scrollHeight;
         }
 
         async function displayRules() {
@@ -888,6 +974,7 @@
             printToTerminal("- Some choices can't be reversed, reflecting real-world decision constraints");
             printToTerminal("- The US has a hidden agenda that influences its responses");
             printToTerminal("- Complete denuclearization is a game-ending decision");
+            printToTerminal("- Security guarantees may not always be reliable");
 
             printToTerminal("\nSTRATEGY CONSIDERATIONS:");
             printToTerminal("- Nuclear weapons provide security but maintain harsh sanctions");
@@ -897,7 +984,7 @@
             
             printToTerminal("\n" + "=".repeat(50));
             
-            await getInput("\nPress Submit to begin the game...", 'continue');
+            await getInput("\nClick Continue to begin the game...", 'continue');
         }
 
         async function playRound() {
@@ -958,7 +1045,7 @@
                 }
                 
                 if (gameState.round <= gameState.maxRounds && gameStatus !== "gameEnding") {
-                    await getInput("\nPress Submit to continue to the next round...", 'continue');
+                    await getInput("\nPress Continue to proceed to the next round...", 'continue');
                 }
             }
 
@@ -966,11 +1053,8 @@
             displayFinalOutcome();
             printToTerminal("\nThank you for playing the Security Guarantee Negotiation Game!");
             
-            // Ask if player wants to restart
-            const restart = await getInput("\nWould you like to play again? (yes/no): ", 'text');
-            if (restart.toLowerCase() === 'y' || restart.toLowerCase() === 'yes') {
-                startGame();
-            }
+            // Display restart button
+            displayRestartPrompt();
         }
 
         async function displayWelcome() {
@@ -986,12 +1070,20 @@
             printToTerminal("making strategic decisions about your nuclear program");
             printToTerminal("=".repeat(50));
             
-            await getInput("\nPress Submit to begin...", 'continue');
+            await getInput("\nClick Continue to proceed...", 'continue');
         }
 
         function startGame() {
             clearTerminal();
             initializeGame();
+            
+            // Initialize with default button configuration
+            updateButtonVisibility('default');
+            
+            // Disable input until needed
+            userInput.disabled = true;
+            userInput.style.display = 'none';
+            
             runGame();
         }
 
@@ -1000,14 +1092,6 @@
             if (event.key === 'Enter') {
                 event.preventDefault();
                 handleInput();
-            }
-        });
-
-        submitBtn.addEventListener('click', handleInput);
-
-        restartBtn.addEventListener('click', function() {
-            if (confirm("Are you sure you want to restart the game?")) {
-                startGame();
             }
         });
 
@@ -1026,10 +1110,6 @@
                 confirmCallback = null;
             }
         });
-
-        // Disable input until needed
-        userInput.disabled = true;
-        submitBtn.disabled = true;
 
         // Start the game when page loads
         window.onload = function() {
