@@ -791,20 +791,6 @@
                 }
             }
             printToTerminal("=".repeat(50));
-            
-            printToTerminal("\nYour available actions as North Korea:");
-            for (const key in gameState.nkCards) {
-                const card = gameState.nkCards[key];
-                if (card.available) {
-                    if (card.gameEnding) {
-                        printToTerminal(`  ${key}. ${card.name} (GAME-ENDING DECISION)`);
-                    } else {
-                        printToTerminal(`  ${key}. ${card.name}`);
-                    }
-                } else {
-                    printToTerminal(`  ${key}. ${card.name} (UNAVAILABLE)`);
-                }
-            }
         }
 
         function displayRoundOutcome(nkMove, usMove) {
