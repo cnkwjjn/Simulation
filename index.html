@@ -733,40 +733,90 @@
         }
 
         function triggerLibyaScenario() {
-            printToTerminal("\n" + "!".repeat(50));
-            printToTerminal("BREAKING NEWS: LIBYA SCENARIO ACTIVATED");
-            printToTerminal("The United States has suddenly changed its position!");
-            printToTerminal("Despite previous agreements, they're now demanding complete regime change.");
-            printToTerminal("Your previous security guarantees have been nullified.");
-            printToTerminal("!".repeat(50));
+    printToTerminal("\n" + "!".repeat(50));
+    printToTerminal("BREAKING NEWS: LIBYA SCENARIO ACTIVATED");
+    printToTerminal("The United States has suddenly changed its position!");
+    printToTerminal("Despite previous agreements, they're now demanding complete regime change.");
+    printToTerminal("Your previous security guarantees have been nullified.");
+    printToTerminal("!".repeat(50));
 
-            // Dramatic effects
-            gameState.nkSecurity = Math.max(10, gameState.nkSecurity - 40);
-            gameState.nkTrust = Math.max(0, gameState.nkTrust - 50);
-            gameState.libyaTriggered = true;
+    // Dramatic effects
+    gameState.nkSecurity = Math.max(10, gameState.nkSecurity - 40);
+    gameState.nkTrust = Math.max(0, gameState.nkTrust - 50);
+    gameState.libyaTriggered = true;
+    
+    printToTerminal("\nNegotiations have dramatically collapsed. The game will now end.");
+    
+    return true;
+}
+
+function checkLibyaScenario() {
+    // Only apply Libya scenario after complete denuclearization if US has regime change agenda
+    if (gameState.denuclearized && gameState.usHiddenAgenda === "Regime change") {
+        return triggerLibyaScenario();
+    }
+
+    // No other conditions will trigger Libya scenario
+    return false;
+}
+
+async function handleLibyaScenarioResponse() {
+    printToTerminal("\nIn light of this shocking betrayal, what will you do?");
+    
+    const choices = [
+        {id: 1, name: "End negotiations and pursue nuclear deterrence", available: true, gameEnding: true},
+        {id: 2, name: "Continue negotiations despite the betrayal", available: true}
+    ];
+    
+    // Use choice buttons for this decision
+    choiceButtons.innerHTML = '';
+    
+    for (let i = 0; i < choices.length; i++) {
+        const choice = choices[i];
+        const btn = document.createElement('button');
+        btn.classList.add('choice-btn');
+        
+        if (choice.gameEnding) {
+            btn.classList.add('game-ending');
         }
-
-        function checkLibyaScenario() {
-            // Always apply Libya scenario after complete denuclearization if US has regime change agenda
-            if (gameState.denuclearized && gameState.usHiddenAgenda === "Regime change") {
-                triggerLibyaScenario();
-                return true;
+        
+        btn.textContent = `${choice.id}. ${choice.name}${choice.gameEnding ? ' (GAME-ENDING DECISION)' : ''}`;
+        
+        btn.addEventListener('click', function() {
+            if (choice.gameEnding) {
+                showConfirmation(`Are you sure you want to end negotiations?`, function(confirmed) {
+                    if (confirmed) {
+                        handleLibyaChoice(choice.id);
+                    }
+                });
+            } else {
+                handleLibyaChoice(choice.id);
             }
-
-            // Apply if player has significantly dismantled facilities in later rounds with regime change agenda
-            const significantDenuclearization = (
-                gameState.history.some(function(h) { return h.nkMove === gameState.nkCards[5].name; }) || // Dismantled some facilities
-                gameState.history.some(function(h) { return h.nkMove === gameState.nkCards[4].name && gameState.round >= 3; }) || // Freeze program for extended period
-                gameState.nkNuclearProgress < 40 // Clear threshold for significant reduction
-            );
-
-            if (gameState.round >= 3 && significantDenuclearization && gameState.usHiddenAgenda === "Regime change" && Math.random() < 0.75) { 
-                triggerLibyaScenario();
-                return true;
+        });
+        
+        choiceButtons.appendChild(btn);
+    }
+    
+    choiceButtons.style.display = 'flex';
+    
+    // Return a promise that resolves with the player's choice
+    return new Promise(function(resolve) {
+        window.handleLibyaChoice = function(choiceId) {
+            choiceButtons.style.display = 'none';
+            
+            if (choiceId === 1) {
+                printToTerminal("You have decided to end negotiations and focus on strengthening your nuclear deterrent.");
+                resolve("gameEnding");
+            } else {
+                printToTerminal("Despite the betrayal, you decide to continue negotiations.");
+                resolve("continue");
             }
-
-            return false;
-        }
+            
+            // Remove the temporary global function
+            delete window.handleLibyaChoice;
+        };
+    });
+}
 
         // Display functions
         function displayGameState() {
@@ -791,6 +841,7 @@
                 }
             }
             printToTerminal("=".repeat(50));
+            
         }
 
         function displayRoundOutcome(nkMove, usMove) {
@@ -974,47 +1025,51 @@
         }
 
         async function playRound() {
-            // Update available options based on prior decisions
-            updateAvailableOptions();
+    // Update available options based on prior decisions
+    updateAvailableOptions();
 
-            // Display game state
-            displayGameState();
-            
-            // Get player move
-            const nkMove = await getPlayerMove();
-            if (nkMove === null) {  // Game was restarted
-                return null;
-            }
-            
-            // Dramatics and US response
-            printToTerminal("\nYou carefully consider your options...");
-            await sleep(1000);
-            printToTerminal("Your diplomats prepare to present your position...");
-            await sleep(1000);
+    // Display game state
+    displayGameState();
+    
+    // Get player move
+    const nkMove = await getPlayerMove();
+    if (nkMove === null) {  // Game was restarted
+        return null;
+    }
+    
+    // Dramatics and US response
+    printToTerminal("\nYou carefully consider your options...");
+    await sleep(1000);
+    printToTerminal("Your diplomats prepare to present your position...");
+    await sleep(1000);
 
-            printToTerminal("\nThe United States is formulating its response...");
-            await sleep(2000);
-            const usMove = determineUsMove(nkMove);
+    printToTerminal("\nThe United States is formulating its response...");
+    await sleep(2000);
+    const usMove = determineUsMove(nkMove);
 
-            // Calculate and display outcome
-            calculateOutcome(nkMove, usMove);
-            displayRoundOutcome(nkMove, usMove);
+    // Calculate and display outcome
+    calculateOutcome(nkMove, usMove);
+    displayRoundOutcome(nkMove, usMove);
 
-            // Check for game-ending move (complete denuclearization)
-            if (nkMove === 6) {
-                // Check for Libya scenario immediately after denuclearization
-                checkLibyaScenario();
-                return "gameEnding";  // End the game immediately
-            }
-
-            // Check for other Libya scenario conditions
-            const libyaTriggered = checkLibyaScenario();
-
-            // Increment round counter
-            gameState.round++;
-
-            return libyaTriggered ? "libyaTriggered" : "continue";
+    // Check for complete denuclearization and Libya scenario
+    if (nkMove === 6) {
+        // Check for Libya scenario immediately after denuclearization
+        const libyaTriggered = checkLibyaScenario();
+        
+        // If Libya scenario triggered, end game immediately
+        if (libyaTriggered) {
+            return "gameEnding";
         }
+        
+        // Otherwise, still end game as denuclearization is game-ending
+        return "gameEnding";
+    }
+
+    // Increment round counter
+    gameState.round++;
+
+    return "continue";
+}
 
         async function runGame() {
             // Display welcome and rules
