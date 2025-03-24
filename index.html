@@ -233,6 +233,36 @@
         let choiceType = 'number';
         let confirmCallback = null;
 
+        function addGameStyles() {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+    .choice-btn {
+        padding: 14px;
+        background-color: #333;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        text-align: left;
+        transition: background-color 0.2s;
+        margin-bottom: 6px;
+    }
+    .choice-btn:hover:not(.unavailable) {
+        background-color: #444;
+        border-color: #666;
+    }
+    .choice-btn.game-ending {
+        border: 2px solid #ff6a6a;
+    }
+    .choice-btn.unavailable {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    `;
+    document.head.appendChild(styleElement);
+}
+
         // Utility functions
         function clearTerminal() {
             terminal.innerHTML = '';
@@ -415,47 +445,78 @@
 
         // Setup choice buttons
         function setupChoiceButtons(choices) {
-            choiceButtons.innerHTML = '';
+    choiceButtons.innerHTML = '';
+    
+    if (choices && choices.length > 0) {
+        for (let i = 0; i < choices.length; i++) {
+            const choice = choices[i];
+            const btn = document.createElement('button');
+            btn.classList.add('choice-btn');
             
-            if (choices && choices.length > 0) {
-                for (let i = 0; i < choices.length; i++) {
-                    const choice = choices[i];
-                    const btn = document.createElement('button');
-                    btn.classList.add('choice-btn');
-                    
-                    if (choice.gameEnding) {
-                        btn.classList.add('game-ending');
-                    }
-                    
-                    if (!choice.available) {
-                        btn.classList.add('unavailable');
-                        btn.disabled = true;
-                    }
-                    
-                    btn.textContent = `${choice.id}. ${choice.name}${choice.gameEnding ? ' (GAME-ENDING DECISION)' : ''}`;
-                    
-                    btn.addEventListener('click', function() {
-                        if (choice.available) {
-                            if (choice.gameEnding) {
-                                showConfirmation(`WARNING: '${choice.name}' is irreversible and game-ending.`, function(confirmed) {
-                                    if (confirmed) {
-                                        handleChoiceSelection(choice.id);
-                                    }
-                                });
-                            } else {
-                                handleChoiceSelection(choice.id);
-                            }
-                        }
-                    });
-                    
-                    choiceButtons.appendChild(btn);
+            if (choice.gameEnding) {
+                btn.classList.add('game-ending');
+            }
+            
+            if (!choice.available) {
+                btn.classList.add('unavailable');
+                btn.disabled = true;
+            }
+            
+            // Create the main button text
+            let btnText = `<strong>${choice.id}. ${choice.name}</strong>${choice.gameEnding ? ' <span style="color:#ff6a6a;">(GAME-ENDING DECISION)</span>' : ''}`;
+            
+            // Add benefits if available with appealing formatting
+            if (choice.benefits && choice.available) {
+                btnText += `<div style="font-size:0.9em; margin-top:5px; color:#8ce38c;">`;
+                btnText += `<strong>Potential Benefits:</strong><br>`;
+                
+                for (let j = 0; j < choice.benefits.length; j++) {
+                    btnText += `• ${choice.benefits[j]}<br>`;
                 }
                 
-                choiceButtons.style.display = 'flex';
-            } else {
-                choiceButtons.style.display = 'none';
+                btnText += `</div>`;
+                
+                // Add costs with less emphasis but still visible
+                if (choice.id == 1) {
+                    // No negative effects
+                } else if (choice.id == 2) {
+                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -3 Security Level</div>`;
+                } else if (choice.id == 3) {
+                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -5 Security Level</div>`;
+                } else if (choice.id == 4) {
+                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -5 Nuclear Progress, -10 Security Level</div>`;
+                } else if (choice.id == 5) {
+                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -15 Nuclear Progress, -15 Security Level</div>`;
+                } else if (choice.id == 6) {
+                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -30 Nuclear Progress, -25 Security Level</div>`;
+                }
             }
+            
+            // Set the HTML content
+            btn.innerHTML = btnText;
+            
+            btn.addEventListener('click', function() {
+                if (choice.available) {
+                    if (choice.gameEnding) {
+                        showConfirmation(`WARNING: '${choice.name}' is irreversible and game-ending.`, function(confirmed) {
+                            if (confirmed) {
+                                handleChoiceSelection(choice.id);
+                            }
+                        });
+                    } else {
+                        handleChoiceSelection(choice.id);
+                    }
+                }
+            });
+            
+            choiceButtons.appendChild(btn);
         }
+        
+        choiceButtons.style.display = 'flex';
+    } else {
+        choiceButtons.style.display = 'none';
+    }
+}
 
         // New function to handle choice selection directly
         function handleChoiceSelection(choiceId) {
@@ -557,22 +618,77 @@
     }
 }
 
-        function getPlayerOptions() {
-            const choiceOptions = [];
-            
-            for (const key in gameState.nkCards) {
-                const card = gameState.nkCards[key];
-                // Create choice data for buttons
-                choiceOptions.push({
-                    id: key,
-                    name: card.name,
-                    available: card.available,
-                    gameEnding: card.gameEnding || false
-                });
-            }
-
-            return choiceOptions;
+function getPlayerOptions() {
+    const choiceOptions = [];
+    
+    // Define comprehensive benefits for each option
+    const optionBenefits = {
+        1: { // Slow nuclear development
+            benefits: [
+                "+5 Nuclear Program (strengthen capability)",
+                "+2 Security Level (increase regime protection)",
+                "Possible US Response: Minor sanctions relief (-5 Sanctions, +2 Security, +5 Trust)",
+                "Possible US Response: Humanitarian aid (-10 Sanctions, +3 Security, +10 Trust)"
+            ]
+        },
+        2: { // Pause nuclear testing
+            benefits: [
+                "+10 US Trust (improved diplomatic standing)",
+                "Possible US Response: Minor sanctions relief (-5 Sanctions, +2 Security, +5 Trust)",
+                "Possible US Response: Humanitarian aid (-10 Sanctions, +3 Security, +10 Trust)",
+                "Possible US Response: Reduced military exercises (+10 Security, +15 Trust)"
+            ]
+        },
+        3: { // Allow limited inspections
+            benefits: [
+                "+15 US Trust (significant diplomatic improvement)",
+                "Possible US Response: Humanitarian aid (-10 Sanctions, +3 Security, +10 Trust)",
+                "Possible US Response: Reduced military exercises (+10 Security, +15 Trust)",
+                "Possible US Response: Non-aggression statement (-15 Sanctions, +15 Security, +20 Trust)"
+            ]
+        },
+        4: { // Freeze nuclear program
+            benefits: [
+                "+20 US Trust (substantial diplomatic improvement)",
+                "Possible US Response: Reduced military exercises (+10 Security, +15 Trust)",
+                "Possible US Response: Non-aggression statement (-15 Sanctions, +15 Security, +20 Trust)",
+                "Possible US Response: Diplomatic relations (-25 Sanctions, +20 Security, +25 Trust)"
+            ]
+        },
+        5: { // Dismantle some facilities
+            benefits: [
+                "+25 US Trust (major diplomatic breakthrough)",
+                "Possible US Response: Non-aggression statement (-15 Sanctions, +15 Security, +20 Trust)",
+                "Possible US Response: Diplomatic relations (-25 Sanctions, +20 Security, +25 Trust)",
+                "Possible US Response: Security guarantee (-30 Sanctions, +30 Security, +35 Trust)"
+            ]
+        },
+        6: { // Completely denuclearize
+            benefits: [
+                "+35 US Trust (maximum diplomatic goodwill)",
+                "Possible US Response: Diplomatic relations (-25 Sanctions, +20 Security, +25 Trust)",
+                "Possible US Response: Security guarantee (-30 Sanctions, +30 Security, +35 Trust)",
+                "Warning: Risk of Libya Scenario if US has 'Regime change' agenda"
+            ]
         }
+    };
+    
+    for (const key in gameState.nkCards) {
+        const card = gameState.nkCards[key];
+        const benefits = optionBenefits[key];
+        
+        // Create choice data for buttons
+        choiceOptions.push({
+            id: key,
+            name: card.name,
+            available: card.available,
+            gameEnding: card.gameEnding || false,
+            benefits: benefits.benefits
+        });
+    }
+
+    return choiceOptions;
+}
 
         async function getPlayerMove() {
             while (true) {
@@ -859,9 +975,9 @@ async function handleLibyaScenarioResponse() {
         }
 
         function displayOutcomeDetails(title, textLines) {
-            printToTerminal("\n************************************");
-            printToTerminal(`~~~YOUR OUTCOME~~~: ${title}`);
-            printToTerminal("************************************");
+            printToTerminal("**************************************************");
+            printToTerminal(`~~~YOUR OUTCOME~~~: \n${title}`);
+            printToTerminal("**************************************************");
             for (let i = 0; i < textLines.length; i++) {
                 printToTerminal(textLines[i]);
             }
@@ -910,7 +1026,8 @@ async function handleLibyaScenarioResponse() {
             printToTerminal(`Economic Situation: ${economicStatus}`);
 
             // Secret US agenda reveal
-            printToTerminal(`\nREVEAL: The United States' hidden agenda was: ${gameState.usHiddenAgenda}`);
+            printToTerminal("\n**************************************************");
+            printToTerminal(`REVEAL: The United States' hidden agenda was: \n${gameState.usHiddenAgenda}`);
 
             // Clearer outcome logic with distinct, non-overlapping conditions
             if (gameState.denuclearized && gameState.libyaTriggered) {
@@ -1115,18 +1232,19 @@ async function handleLibyaScenarioResponse() {
         }
 
         function startGame() {
-            clearTerminal();
-            initializeGame();
-            
-            // Initialize with default button configuration
-            updateButtonVisibility('default');
-            
-            // Disable input until needed
-            userInput.disabled = true;
-            userInput.style.display = 'none';
-            
-            runGame();
-        }
+    clearTerminal();
+    initializeGame();
+    addGameStyles(); // Add this line to apply the CSS styles
+    
+    // Initialize with default button configuration
+    updateButtonVisibility('default');
+    
+    // Disable input until needed
+    userInput.disabled = true;
+    userInput.style.display = 'none';
+    
+    runGame();
+}
 
         // Event listeners
         userInput.addEventListener('keypress', function(event) {
