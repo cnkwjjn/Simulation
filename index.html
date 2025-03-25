@@ -253,7 +253,7 @@
         border-color: #666;
     }
     .choice-btn.game-ending {
-        border: 5px solid #355e37;
+        border: 2px solid #8ce38c; /* Change from red to green */
     }
     .choice-btn.unavailable {
         opacity: 0.5;
@@ -455,6 +455,7 @@
             
             if (choice.gameEnding) {
                 btn.classList.add('game-ending');
+                // No longer need to add red styling in the button class
             }
             
             if (!choice.available) {
@@ -462,8 +463,13 @@
                 btn.disabled = true;
             }
             
-            // Create the main button text
-            let btnText = `<strong>${choice.id}. ${choice.name}</strong>${choice.gameEnding ? ' <span style="color:#ff6a6a;">(GAME-ENDING DECISION)</span>' : ''}`;
+            // Create the main button text with green game-ending text 
+            let btnText = `<strong>${choice.id}. ${choice.name}</strong>`;
+            
+            // Add game-ending text in green instead of red
+            if (choice.gameEnding) {
+                btnText += ` <span style="color:#8ce38c;">(GAME-ENDING DECISION)</span>`;
+            }
             
             // Add benefits if available with appealing formatting
             if (choice.benefits && choice.available) {
