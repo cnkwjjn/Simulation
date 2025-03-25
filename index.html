@@ -481,21 +481,6 @@
                 }
                 
                 btnText += `</div>`;
-                
-                // Add costs with less emphasis but still visible
-                if (choice.id == 1) {
-                    // No negative effects
-                } else if (choice.id == 2) {
-                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -3 Security Level</div>`;
-                } else if (choice.id == 3) {
-                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -5 Security Level</div>`;
-                } else if (choice.id == 4) {
-                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -5 Nuclear Progress, -10 Security Level</div>`;
-                } else if (choice.id == 5) {
-                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -15 Nuclear Progress, -15 Security Level</div>`;
-                } else if (choice.id == 6) {
-                    btnText += `<div style="font-size:0.85em; margin-top:3px; color:#aaa;">Note: -30 Nuclear Progress, -25 Security Level</div>`;
-                }
             }
             
             // Set the HTML content
